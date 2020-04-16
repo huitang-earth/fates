@@ -407,9 +407,9 @@ contains
 
           leaf_c   = currentCohort%prt%GetState(leaf_organ, all_carbon_elements)
 
-          currentCohort%treelai = tree_lai(leaf_c, currentCohort%pft, currentCohort%c_area, &
+          call tree_lai(leaf_c, currentCohort%treelai, currentCohort%pft, currentCohort%c_area, &
                                            currentCohort%n, currentCohort%canopy_layer,               &
-                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top )    
+                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top, inverse=.false. )    
 
           currentCohort%treesai = tree_sai(currentCohort%pft, currentCohort%dbh, currentCohort%canopy_trim, &
                                            currentCohort%c_area, currentCohort%n, currentCohort%canopy_layer, &

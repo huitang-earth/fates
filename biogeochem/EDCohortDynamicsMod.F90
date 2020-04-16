@@ -260,9 +260,10 @@ contains
     leaf_c = new_cohort%prt%GetState(leaf_organ,carbon12_element)
 
 
-    new_cohort%treelai = tree_lai(leaf_c, new_cohort%pft, new_cohort%c_area,    &
+    call tree_lai(leaf_c, new_cohort%treelai, new_cohort%pft, new_cohort%c_area,    &
                                   new_cohort%n, new_cohort%canopy_layer,               &
-                                  patchptr%canopy_layer_tlai,new_cohort%vcmax25top )    
+                                  patchptr%canopy_layer_tlai,new_cohort%vcmax25top,inverse=.false.)    
+
 
     new_cohort%treesai = tree_sai(new_cohort%pft, new_cohort%dbh, new_cohort%canopy_trim,   &
                                   new_cohort%c_area, new_cohort%n, new_cohort%canopy_layer, &
@@ -1235,9 +1236,9 @@ contains
 
                                    leaf_c = currentCohort%prt%GetState(leaf_organ,all_carbon_elements)
 
-                                   currentCohort%treelai = tree_lai(leaf_c, currentCohort%pft, currentCohort%c_area, newn, &
+                                   call tree_lai(leaf_c, currentCohort%treelai, currentCohort%pft, currentCohort%c_area, newn, &
                                         currentCohort%canopy_layer, currentPatch%canopy_layer_tlai, &
-                                        currentCohort%vcmax25top)
+                                        currentCohort%vcmax25top,inverse=.false.)
                                    currentCohort%treesai = tree_sai(currentCohort%pft, currentCohort%dbh, currentCohort%canopy_trim, &
                                         currentCohort%c_area, newn, currentCohort%canopy_layer, &
                                         currentPatch%canopy_layer_tlai, currentCohort%treelai,currentCohort%vcmax25top,1 ) 
@@ -1382,10 +1383,10 @@ contains
                                       call carea_allom(currentCohort%dbh,currentCohort%n,currentSite%spread, &
                                            currentCohort%pft,currentCohort%c_area)
                                       leaf_c   = currentCohort%prt%GetState(leaf_organ, carbon12_element)
-                                      currentCohort%treelai = tree_lai(leaf_c,             &
+                                      call tree_lai(leaf_c, currentCohort%treelai,            &
                                            currentCohort%pft, currentCohort%c_area, currentCohort%n, &
                                            currentCohort%canopy_layer, currentPatch%canopy_layer_tlai, &
-                                           currentCohort%vcmax25top  )			    
+                                           currentCohort%vcmax25top, inverse=.false.  )			    
                                       call updateSizeDepTreeHydProps(currentSite,currentCohort, bc_in)  				   
                                    endif
 

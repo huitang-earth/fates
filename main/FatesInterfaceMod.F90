@@ -401,6 +401,9 @@ module FatesInterfaceMod
       ! Filter for vegetation patches with a positive zenith angle (daylight)
       logical, allocatable :: filter_vegzen_pa(:)
 
+      real(r8), allocatable :: tlai_pa(:)  ! total leaf area index
+      real(r8), allocatable :: tsai_pa(:)  ! total stem area index
+
       ! Cosine of the zenith angle (0-1), by patch
       ! Note RGK: It does not seem like the code would currently generate
       !           different zenith angles for different patches (nor should it)
@@ -469,7 +472,10 @@ module FatesInterfaceMod
       real(r8),allocatable :: hksat_sisl(:)        ! hydraulic conductivity at saturation (mm H2O /s)
       real(r8),allocatable :: h2o_liq_sisl(:)      ! Liquid water mass in each layer (kg/m2)
       real(r8) :: smpmin_si                        ! restriction for min of soil potential (mm)
-      
+
+      ! Add PFT fraction, LAI SAI Height (Top, bottom) etc. Hui Tang
+               
+
    end type bc_in_type
 
 
@@ -775,6 +781,8 @@ contains
 
       ! Canopy Radiation
       allocate(bc_in%filter_vegzen_pa(maxPatchesPerSite))
+      allocate(bc_in%tlai_pa(maxPatchesPerSite))
+      allocate(bc_in%tsai_pa(maxPatchesPerSite))
       allocate(bc_in%coszen_pa(maxPatchesPerSite))
       allocate(bc_in%albgr_dir_rb(hlm_numSWb))
       allocate(bc_in%albgr_dif_rb(hlm_numSWb))
@@ -903,6 +911,8 @@ contains
       this%bc_in(s)%h2o_liqvol_sl(:)    = 0.0_r8
       this%bc_in(s)%filter_vegzen_pa(:) = .false.
       this%bc_in(s)%coszen_pa(:)        = 0.0_r8
+      this%bc_in(s)%tlai_pa(:)          = 0.0_r8
+      this%bc_in(s)%tsai_pa(:)          = 0.0_r8
       this%bc_in(s)%albgr_dir_rb(:)     = 0.0_r8
       this%bc_in(s)%albgr_dif_rb(:)     = 0.0_r8
       this%bc_in(s)%max_rooting_depth_index_col = 0

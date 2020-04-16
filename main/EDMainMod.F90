@@ -537,7 +537,9 @@ contains
     type (ed_patch_type) , pointer :: currentPatch   
     !-----------------------------------------------------------------------
 
-    call canopy_spread(currentSite)
+    if (hlm_use_ed_st3.eq.ifalse) then
+      call canopy_spread(currentSite)
+    end if
 
     call TotalBalanceCheck(currentSite,6)
 

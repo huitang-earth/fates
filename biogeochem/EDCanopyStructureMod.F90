@@ -28,6 +28,7 @@ module EDCanopyStructureMod
   use FatesInterfaceMod     , only : hlm_use_planthydro
   use FatesInterfaceMod     , only : hlm_use_cohort_age_tracking
   use FatesInterfaceMod     , only : numpft
+  use FatesInterfaceMod     , only : hlm_use_ed_st3 
   use FatesPlantHydraulicsMod, only : UpdateH2OVeg,InitHydrCohort, RecruitWaterStorage
   use EDTypesMod            , only : maxCohortsPerPatch
   
@@ -1275,7 +1276,7 @@ contains
     type (ed_cohort_type) , pointer :: currentCohort
     integer  :: s
     integer  :: ft               ! plant functional type
-    integer  :: ifp
+    integer  :: ifp             
     integer  :: patchn           ! identification number for each patch. 
     real(r8) :: canopy_leaf_area ! total amount of leaf area in the vegetated area. m2.  
     real(r8) :: leaf_c           ! leaf carbon [kg]
@@ -1301,8 +1302,10 @@ contains
 
        currentPatch => sites(s)%oldest_patch
 
+       ifp=0
+
        do while(associated(currentPatch))
-          
+          ifp = ifp+1
           !zero cohort-summed variables. 
           currentPatch%total_canopy_area = 0.0_r8
           currentPatch%total_tree_area = 0.0_r8
@@ -1327,16 +1330,25 @@ contains
                   currentCohort%size_class,currentCohort%size_by_pft_class)
 
              if (hlm_use_cohort_age_tracking .eq. itrue) then
-             call coagetype_class_index(currentCohort%coage,currentCohort%pft, &
+                call coagetype_class_index(currentCohort%coage,currentCohort%pft, &
                   currentCohort%coage_class,currentCohort%coage_by_pft_class)
-          end if
+             end if
           
              call carea_allom(currentCohort%dbh,currentCohort%n,sites(s)%spread,&
                   currentCohort%pft,currentCohort%c_area)
 
-             currentCohort%treelai = tree_lai(leaf_c,             &
-                  currentCohort%pft, currentCohort%c_area, currentCohort%n, &
-                  currentCohort%canopy_layer, currentPatch%canopy_layer_tlai,currentCohort%vcmax25top )
+             if (hlm_use_ed_st3.eq.ifalse) then
+               call tree_lai(leaf_c,currentCohort%treelai,currentCohort%pft,currentCohort%c_area, &
+                                           currentCohort%n,currentCohort%canopy_layer,&
+                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse=.false.)
+             else   
+               currentCohort%treelai = bc_in(s)%tlai_pa(ifp)
+               currentCohort%treesai = bc_in(s)%tsai_pa(ifp)
+               call tree_lai(leaf_c,currentCohort%treelai,currentCohort%pft,currentCohort%c_area, &
+                                           currentCohort%n,currentCohort%canopy_layer,&
+                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse=.true.)
+               currentCohort%prt%variables(1)%val(1) = leaf_c
+             endif
 
              canopy_leaf_area = canopy_leaf_area + currentCohort%treelai *currentCohort%c_area
                   
@@ -1433,6 +1445,8 @@ contains
     type(ed_site_type)     , intent(inout) :: currentSite
     real(r8)               , intent(in)    :: snow_depth_si
     real(r8)               , intent(in)    :: frac_sno_eff_si
+    real(r8)               , intent(in)    :: tlai
+    real(r8)               , intent(in)    :: tsai
 
     !
     ! !LOCAL VARIABLES:
@@ -1470,6 +1484,7 @@ contains
     ! Each leaf is defined by how deep in the canopy it is, in terms of LAI units.  (FIX(RF,032414), GB)
     
     currentPatch => currentSite%oldest_patch   
+
     do while(associated(currentPatch))
 
        ! --------------------------------------------------------------------------------
@@ -1507,16 +1522,17 @@ contains
           ! Note that the canopy_layer_lai is also calculated in this loop
           ! but since we go top down in terms of plant size, we should be okay
 
-          leaf_c          = currentCohort%prt%GetState(leaf_organ,all_carbon_elements)
 
-          currentCohort%treelai = tree_lai(leaf_c, currentCohort%pft, currentCohort%c_area, &
-                                           currentCohort%n, currentCohort%canopy_layer,               &
-                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top )    
-
-          currentCohort%treesai = tree_sai(currentCohort%pft, currentCohort%dbh, currentCohort%canopy_trim, &
+          if (hlm_use_ed_st3.eq.ifalse) then
+               leaf_c          =currentCohort%prt%GetState(leaf_organ,all_carbon_elements)
+               call tree_lai(leaf_c,currentCohort%treelai,currentCohort%pft,currentCohort%c_area, &
+                                           currentCohort%n,currentCohort%canopy_layer,&
+                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse=.false.)
+               currentCohort%treesai = tree_sai(currentCohort%pft, currentCohort%dbh, currentCohort%canopy_trim, &
                                            currentCohort%c_area, currentCohort%n, currentCohort%canopy_layer, &
                                            currentPatch%canopy_layer_tlai, currentCohort%treelai , &
-                                           currentCohort%vcmax25top,4)  
+                                          currentCohort%vcmax25top,4)  
+          endif
 
           currentCohort%lai =  currentCohort%treelai *currentCohort%c_area/currentPatch%total_canopy_area 
           currentCohort%sai =  currentCohort%treesai *currentCohort%c_area/currentPatch%total_canopy_area  
