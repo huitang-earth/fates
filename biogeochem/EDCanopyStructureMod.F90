@@ -1302,6 +1302,7 @@ contains
 
        currentPatch => sites(s)%oldest_patch
 
+       ! Hui Tang: ifp is the index for patches. This is needed for reading lai/sai data from surface data file from ctsm 
        ifp=0
 
        do while(associated(currentPatch))
@@ -1337,16 +1338,33 @@ contains
              call carea_allom(currentCohort%dbh,currentCohort%n,sites(s)%spread,&
                   currentCohort%pft,currentCohort%c_area)
 
+             ! Hui Tang: If using standing structure, prescribe lai  
              if (hlm_use_ed_st3.eq.ifalse) then
                call tree_lai(leaf_c,currentCohort%treelai,currentCohort%pft,currentCohort%c_area, &
                                            currentCohort%n,currentCohort%canopy_layer,&
                                            currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse=.false.)
-             else   
-               currentCohort%treelai = bc_in(s)%tlai_pa(ifp)
-               currentCohort%treesai = bc_in(s)%tsai_pa(ifp)
+             else
+               ! Hui Tang: Read in the lai and sai from surface data file; Cohort%treelai is equivalent to tlai_pa(ifp); matching PFT data from CLM to FATES;
+               ! More work on improve the cross-walk table between CLM and FATES PFTs????
+               if (ft == 1) then     
+                  currentCohort%treelai = bc_in(s)%tlai_pa(2)
+                  currentCohort%treesai = bc_in(s)%tsai_pa(2)
+               else if (ft == 2) then
+                  currentCohort%treelai = bc_in(s)%tlai_pa(8)
+                  currentCohort%treesai = bc_in(s)%tsai_pa(8)
+               else if (ft == 3) then
+                  currentCohort%treelai = bc_in(s)%tlai_pa(11)
+                  currentCohort%treesai = bc_in(s)%tsai_pa(11)
+               else if (ft == 4) then
+                  currentCohort%treelai = bc_in(s)%tlai_pa(12)
+                  currentCohort%treesai = bc_in(s)%tsai_pa(12)
+               end if    
+
+               ! Hui Tang: In inverse mode of the function, leaf_c is the output variable
                call tree_lai(leaf_c,currentCohort%treelai,currentCohort%pft,currentCohort%c_area, &
                                            currentCohort%n,currentCohort%canopy_layer,&
                                            currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse=.true.)
+               ! Hui Tang: Update leaf_c of the cohort accordingly                            
                currentCohort%prt%variables(1)%val(1) = leaf_c
              endif
 
@@ -1445,8 +1463,8 @@ contains
     type(ed_site_type)     , intent(inout) :: currentSite
     real(r8)               , intent(in)    :: snow_depth_si
     real(r8)               , intent(in)    :: frac_sno_eff_si
-    real(r8)               , intent(in)    :: tlai
-    real(r8)               , intent(in)    :: tsai
+!    real(r8)               , intent(in)    :: tlai      ! Hui Tang: Why tlai is used here?
+!    real(r8)               , intent(in)    :: tsai      ! Hui Tang: Why tsai is used here?
 
     !
     ! !LOCAL VARIABLES:
@@ -1523,8 +1541,13 @@ contains
           ! but since we go top down in terms of plant size, we should be okay
 
 
+          ! Hui Tang: Here, only when st3 mode is false, leaf_c need to be updated to calculate lai
+          ! Hui Tang: Should sai also need to be changed?
+          ! Hui Tang: tree_lai may not need to be called again, since tree_lai has been called in "canopy_summarization". But tree_sai need to be called for the first time to update?
+                 
           if (hlm_use_ed_st3.eq.ifalse) then
                leaf_c          =currentCohort%prt%GetState(leaf_organ,all_carbon_elements)
+               ! Hui Tang: "tree_lai" is now a subroutine (not a function); "tree_sai" need to be changed also?
                call tree_lai(leaf_c,currentCohort%treelai,currentCohort%pft,currentCohort%c_area, &
                                            currentCohort%n,currentCohort%canopy_layer,&
                                            currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse=.false.)

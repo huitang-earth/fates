@@ -585,6 +585,7 @@ contains
 
   ! =====================================================================================
 
+  ! Hui Tang: modify tree_lai from a function to a subroutine to have the option to inversely calculate leaf_c from prescribed lai 
   subroutine tree_lai( leaf_c, treelai, pft, c_area, nplant, cl, canopy_lai, vcmax25top, inverse)
 
     ! -----------------------------------------------------------------------------------
@@ -760,7 +761,7 @@ contains
        else
           treelai = 0.0_r8
        endif ! (leafc_per_unitarea > 0.0_r8)
-    endif
+    endif ! (do_inverse)
   end subroutine tree_lai
 
   ! ============================================================================
@@ -790,6 +791,7 @@ contains
 
     call bleaf(dbh,pft,canopy_trim,target_bleaf)
 
+    ! Hui Tang: tree_lai is now a subroutine (not a function).
     call tree_lai( target_bleaf, target_lai, pft, c_area, nplant, cl, canopy_lai, vcmax25top, inverse=.false.) 
 
     tree_sai   =  EDPftvarcon_inst%allom_sai_scaler(pft) * target_lai

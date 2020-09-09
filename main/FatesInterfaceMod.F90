@@ -400,7 +400,8 @@ module FatesInterfaceMod
       
       ! Filter for vegetation patches with a positive zenith angle (daylight)
       logical, allocatable :: filter_vegzen_pa(:)
-
+      
+      ! Hui Tang: Add "tlai_pa" and "tsai_pa" as inputdata for FATES 
       real(r8), allocatable :: tlai_pa(:)  ! total leaf area index
       real(r8), allocatable :: tsai_pa(:)  ! total stem area index
 
@@ -781,8 +782,8 @@ contains
 
       ! Canopy Radiation
       allocate(bc_in%filter_vegzen_pa(maxPatchesPerSite))
-      allocate(bc_in%tlai_pa(maxPatchesPerSite))
-      allocate(bc_in%tsai_pa(maxPatchesPerSite))
+      allocate(bc_in%tlai_pa(maxPatchesPerSite))        ! Hui Tang: Add "tlai_pa" and "tsai_pa" as inputdata for FATES
+      allocate(bc_in%tsai_pa(maxPatchesPerSite))        ! Hui Tang: Add "tlai_pa" and "tsai_pa" as inputdata for FATES
       allocate(bc_in%coszen_pa(maxPatchesPerSite))
       allocate(bc_in%albgr_dir_rb(hlm_numSWb))
       allocate(bc_in%albgr_dif_rb(hlm_numSWb))
@@ -911,8 +912,8 @@ contains
       this%bc_in(s)%h2o_liqvol_sl(:)    = 0.0_r8
       this%bc_in(s)%filter_vegzen_pa(:) = .false.
       this%bc_in(s)%coszen_pa(:)        = 0.0_r8
-      this%bc_in(s)%tlai_pa(:)          = 0.0_r8
-      this%bc_in(s)%tsai_pa(:)          = 0.0_r8
+      this%bc_in(s)%tlai_pa(:)          = 0.0_r8              ! Hui Tang: Add "tlai_pa" and "tsai_pa" as inputdata for FATES
+      this%bc_in(s)%tsai_pa(:)          = 0.0_r8              ! Hui Tang: Add "tlai_pa" and "tsai_pa" as inputdata for FATES
       this%bc_in(s)%albgr_dir_rb(:)     = 0.0_r8
       this%bc_in(s)%albgr_dif_rb(:)     = 0.0_r8
       this%bc_in(s)%max_rooting_depth_index_col = 0

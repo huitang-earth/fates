@@ -406,7 +406,7 @@ contains
           call carea_allom(currentCohort%dbh,currentCohort%n,currentSite%spread,currentCohort%pft,currentCohort%c_area)
 
           leaf_c   = currentCohort%prt%GetState(leaf_organ, all_carbon_elements)
-
+          ! Hui Tang: tree_lai is now a subroutine (not a function)
           call tree_lai(leaf_c, currentCohort%treelai, currentCohort%pft, currentCohort%c_area, &
                                            currentCohort%n, currentCohort%canopy_layer,               &
                                            currentPatch%canopy_layer_tlai,currentCohort%vcmax25top, inverse=.false. )    

@@ -259,7 +259,7 @@ contains
     ! Query PARTEH for the leaf carbon [kg]
     leaf_c = new_cohort%prt%GetState(leaf_organ,carbon12_element)
 
-
+    ! Hui Tang: tree_lai is now a subroutine (not a function)
     call tree_lai(leaf_c, new_cohort%treelai, new_cohort%pft, new_cohort%c_area,    &
                                   new_cohort%n, new_cohort%canopy_layer,               &
                                   patchptr%canopy_layer_tlai,new_cohort%vcmax25top,inverse=.false.)    
@@ -1235,7 +1235,8 @@ contains
                                    end select
 
                                    leaf_c = currentCohort%prt%GetState(leaf_organ,all_carbon_elements)
-
+                                   
+                                   ! Hui Tang: tree_lai is now a subroutine (not a function)
                                    call tree_lai(leaf_c, currentCohort%treelai, currentCohort%pft, currentCohort%c_area, newn, &
                                         currentCohort%canopy_layer, currentPatch%canopy_layer_tlai, &
                                         currentCohort%vcmax25top,inverse=.false.)
@@ -1383,6 +1384,7 @@ contains
                                       call carea_allom(currentCohort%dbh,currentCohort%n,currentSite%spread, &
                                            currentCohort%pft,currentCohort%c_area)
                                       leaf_c   = currentCohort%prt%GetState(leaf_organ, carbon12_element)
+                                      ! Hui Tang: tree_lai is now a subroutine (not a function)
                                       call tree_lai(leaf_c, currentCohort%treelai,            &
                                            currentCohort%pft, currentCohort%c_area, currentCohort%n, &
                                            currentCohort%canopy_layer, currentPatch%canopy_layer_tlai, &
