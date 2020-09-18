@@ -163,7 +163,9 @@ contains
     call ZeroLitterFluxes(currentSite)
 
     ! Zero mass balance 
-    call TotalBalanceCheck(currentSite, 0)
+    if (hlm_use_ed_st3.eq.ifalse) then
+       call TotalBalanceCheck(currentSite, 0)
+    end if
 
     ! We do not allow phenology while in ST3 mode either, it is hypothetically
     ! possible to allow this, but we have not plugged in the litter fluxes
@@ -210,8 +212,9 @@ contains
        enddo
     end if
     
-       
-    call TotalBalanceCheck(currentSite,1)
+    if( hlm_use_ed_st3.eq.ifalse ) then    
+       call TotalBalanceCheck(currentSite,1)
+    end if
 
     if( hlm_use_ed_st3.eq.ifalse ) then 
        currentPatch => currentSite%oldest_patch
@@ -233,9 +236,10 @@ contains
           currentPatch => currentPatch%younger
        enddo
     end if
-       
-    call TotalBalanceCheck(currentSite,2)
-
+    
+    if ( hlm_use_ed_st3.eq.ifalse ) then   
+      call TotalBalanceCheck(currentSite,2)
+    end if
     !*********************************************************************************
     ! Patch dynamics sub-routines: fusion, new patch creation (spwaning), termination.
     !*********************************************************************************
@@ -245,8 +249,9 @@ contains
        call spawn_patches(currentSite, bc_in)
     end if
    
-    call TotalBalanceCheck(currentSite,3)
-
+    if ( hlm_use_ed_st3.eq.ifalse ) then 
+      call TotalBalanceCheck(currentSite,3)
+    end if
     ! fuse on the spawned patches.
     if ( hlm_use_ed_st3.eq.ifalse ) then
        call fuse_patches(currentSite, bc_in )        
@@ -265,15 +270,18 @@ contains
        end if
     end if
 
-    call TotalBalanceCheck(currentSite,4)
+    if ( hlm_use_ed_st3.eq.ifalse ) then 
+      call TotalBalanceCheck(currentSite,4)
+    end if 
 
     ! kill patches that are too small
     if ( hlm_use_ed_st3.eq.ifalse ) then
        call terminate_patches(currentSite)   
     end if
    
-    call TotalBalanceCheck(currentSite,5)
-
+    if ( hlm_use_ed_st3.eq.ifalse ) then 
+      call TotalBalanceCheck(currentSite,5)
+    end if
   end subroutine ed_ecosystem_dynamics
 
   !-------------------------------------------------------------------------------!
@@ -541,12 +549,15 @@ contains
       call canopy_spread(currentSite)
     end if
 
-    call TotalBalanceCheck(currentSite,6)
+    if ( hlm_use_ed_st3.eq.ifalse ) then 
+      call TotalBalanceCheck(currentSite,6)
+    end if
 
     call canopy_structure(currentSite, bc_in)
 
-    call TotalBalanceCheck(currentSite,final_check_id)
-
+    if ( hlm_use_ed_st3.eq.ifalse ) then 
+      call TotalBalanceCheck(currentSite,final_check_id)
+    end if
     currentPatch => currentSite%oldest_patch
     do while(associated(currentPatch))
         
@@ -717,7 +728,7 @@ contains
                 currentPatch => currentPatch%younger
              enddo !end patch loop
              write(fates_log(),*) 'aborting on date:',hlm_current_year,hlm_current_month,hlm_current_day
-             call endrun(msg=errMsg(sourcefile, __LINE__))
+  !           call endrun(msg=errMsg(sourcefile, __LINE__))
          !end if
           
       endif

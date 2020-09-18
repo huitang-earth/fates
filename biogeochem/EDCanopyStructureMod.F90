@@ -1251,7 +1251,7 @@ contains
 
   ! =====================================================================================
 
-  subroutine canopy_summarization( nsites, sites, bc_in )
+  subroutine canopy_summarization( nsites, sites, bc_in, inverse )
 
      ! ----------------------------------------------------------------------------------
      ! Much of this routine was once ed_clm_link minus all the IO and history stuff
@@ -1268,8 +1268,10 @@ contains
     
     ! !ARGUMENTS    
     integer                 , intent(in)            :: nsites
+    logical                 , intent(in)            :: inverse 
     type(ed_site_type)      , intent(inout), target :: sites(nsites)
     type(bc_in_type)        , intent(in)            :: bc_in(nsites)
+
     !
     ! !LOCAL VARIABLES:
     type (ed_patch_type)  , pointer :: currentPatch
@@ -1359,11 +1361,12 @@ contains
                   currentCohort%treelai = bc_in(s)%tlai_pa(12)
                   currentCohort%treesai = bc_in(s)%tsai_pa(12)
                end if    
-
+               !print *, "currentCohort%treelai=", currentCohort%treelai, currentCohort%treesai 
+               !print *, "tlai3",s, ifp, ft, inverse, currentCohort%treelai, bc_in(s)%tlai_pa(:) 
                ! Hui Tang: In inverse mode of the function, leaf_c is the output variable
                call tree_lai(leaf_c,currentCohort%treelai,currentCohort%pft,currentCohort%c_area, &
                                            currentCohort%n,currentCohort%canopy_layer,&
-                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse=.true.)
+                                           currentPatch%canopy_layer_tlai,currentCohort%vcmax25top,inverse)
                ! Hui Tang: Update leaf_c of the cohort accordingly                            
                currentCohort%prt%variables(1)%val(1) = leaf_c
              endif
@@ -1529,7 +1532,7 @@ contains
        
        if (currentPatch%total_canopy_area > nearzero ) then
 
-
+       ! print *, "OK0"
        currentCohort => currentPatch%tallest
        do while(associated(currentCohort)) 
 
@@ -1561,7 +1564,8 @@ contains
           currentCohort%sai =  currentCohort%treesai *currentCohort%c_area/currentPatch%total_canopy_area  
 
           ! Number of actual vegetation layers in this cohort's crown
-          currentCohort%nv =  ceiling((currentCohort%treelai+currentCohort%treesai)/dinc_ed)  
+          currentCohort%nv =  ceiling((currentCohort%treelai+currentCohort%treesai)/dinc_ed)
+          ! print *, "currentCohort%nv=", currentCohort%nv, currentCohort%treelai, currentCohort%treesai  
 
           currentPatch%ncan(cl,ft) = max(currentPatch%ncan(cl,ft),currentCohort%NV)
 
@@ -1660,7 +1664,6 @@ contains
              call endrun(msg=errMsg(sourcefile, __LINE__))
           endif
           
-          
        else ! smooth leaf distribution  
 
           ! -----------------------------------------------------------------------------
@@ -1669,10 +1672,10 @@ contains
           ! and canopy area to the accumulators. 
           ! -----------------------------------------------------------------------------
 
-             
+             !print *, "OK2"             
              currentCohort => currentPatch%shortest
              do while(associated(currentCohort))   
-                
+                !print *, "OK3"  
                 ft = currentCohort%pft 
                 cl = currentCohort%canopy_layer
                 
@@ -1712,7 +1715,7 @@ contains
                 ! --------------------------------------------------------------------------
                 
                 do iv = 1,currentCohort%NV
-                   
+                   ! print *, "OK4"  
                    ! This loop builds the arrays that define the effective (not snow covered)
                    ! and total (includes snow covered) area indices for leaves and stems
                    ! We calculate the absolute elevation of each layer to help determine if the layer
@@ -1771,8 +1774,10 @@ contains
                          remainder * (1._r8 - fleaf) * currentCohort%c_area/currentPatch%total_canopy_area * &
                          fraction_exposed
                    
+!                   print *, "currentPatch%canopy_area_profile(cl,ft,iv)0= ", currentPatch%canopy_area_profile(cl,ft,iv)
                    currentPatch%canopy_area_profile(cl,ft,iv) = currentPatch%canopy_area_profile(cl,ft,iv) + &
                          currentCohort%c_area/currentPatch%total_canopy_area
+ !                  print *, "currentPatch%canopy_area_profile(cl,ft,iv)1= ", currentPatch%canopy_area_profile(cl,ft,iv)
                    
                    currentPatch%layer_height_profile(cl,ft,iv) = currentPatch%layer_height_profile(cl,ft,iv) + &
                          (remainder * fleaf * currentCohort%c_area/currentPatch%total_canopy_area * &
