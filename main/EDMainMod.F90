@@ -1,4 +1,3 @@
-
 module EDMainMod
 
   ! ===========================================================================
@@ -8,6 +7,7 @@ module EDMainMod
   use shr_kind_mod             , only : r8 => shr_kind_r8
   
   use FatesGlobals             , only : fates_log
+
   use FatesInterfaceTypesMod        , only : hlm_freq_day
   use FatesInterfaceTypesMod        , only : hlm_day_of_year
   use FatesInterfaceTypesMod        , only : hlm_days_per_year
@@ -20,10 +20,12 @@ module EDMainMod
   use FatesInterfaceTypesMod        , only : hlm_reference_date
   use FatesInterfaceTypesMod        , only : hlm_use_ed_prescribed_phys
   use FatesInterfaceTypesMod        , only : hlm_use_ed_st3 
+  use FatesInterfaceTypesMod        , only : hlm_use_sp
   use FatesInterfaceTypesMod        , only : bc_in_type
   use FatesInterfaceTypesMod        , only : bc_out_type
   use FatesInterfaceTypesMod        , only : hlm_masterproc
   use FatesInterfaceTypesMod        , only : numpft
+  use FatesInterfaceTypesMod        , only : hlm_use_nocomp
   use PRTGenericMod            , only : prt_carbon_allom_hyp
   use PRTGenericMod            , only : prt_cnp_flex_allom_hyp
   use PRTGenericMod            , only : nitrogen_element
@@ -38,6 +40,7 @@ module EDMainMod
   use EDPatchDynamicsMod       , only : spawn_patches
   use EDPatchDynamicsMod       , only : terminate_patches
   use EDPhysiologyMod          , only : phenology
+  use EDPhysiologyMod          , only : satellite_phenology
   use EDPhysiologyMod          , only : recruitment
   use EDPhysiologyMod          , only : trim_canopy
   use EDPhysiologyMod          , only : SeedIn
@@ -139,6 +142,7 @@ contains
     ! !LOCAL VARIABLES:
     type(ed_patch_type), pointer :: currentPatch
     integer :: el              ! Loop counter for elements
+    integer :: do_patch_dynamics ! for some modes, we turn off patch dynamics
 
     !-----------------------------------------------------------------------
 
@@ -183,12 +187,16 @@ contains
     ! We do not allow phenology while in ST3 mode either, it is hypothetically
     ! possible to allow this, but we have not plugged in the litter fluxes
     ! of flushing or turning over leaves for non-dynamics runs
-    if (hlm_use_ed_st3.eq.ifalse) then
-       call phenology(currentSite, bc_in )
+    if (hlm_use_ed_st3.eq.ifalse)then
+      if(hlm_use_sp.eq.ifalse) then
+        call phenology(currentSite, bc_in )
+      else 
+        call satellite_phenology(currentSite, bc_in )
+      end if ! SP phenology
     end if
 
 
-    if (hlm_use_ed_st3.eq.ifalse) then   ! Bypass if ST3
+    if (hlm_use_ed_st3.eq.ifalse.and.hlm_use_sp.eq.ifalse) then   ! Bypass if ST3
        call fire_model(currentSite, bc_in) 
 
        ! Calculate disturbance and mortality based on previous timestep vegetation.
@@ -196,7 +204,7 @@ contains
        call disturbance_rates(currentSite, bc_in)
     end if
 
-    if (hlm_use_ed_st3.eq.ifalse) then
+    if (hlm_use_ed_st3.eq.ifalse.and.hlm_use_sp.eq.ifalse) then
        ! Integrate state variables from annual rates to daily timestep
        call ed_integrate_state_variables(currentSite, bc_in, bc_out ) 
     else
@@ -214,7 +222,7 @@ contains
     ! Reproduction, Recruitment and Cohort Dynamics : controls cohort organization 
     !******************************************************************************
 
-    if(hlm_use_ed_st3.eq.ifalse) then 
+    if(hlm_use_ed_st3.eq.ifalse.and.hlm_use_sp.eq.ifalse) then 
        currentPatch => currentSite%oldest_patch
        do while (associated(currentPatch))                 
           
@@ -225,10 +233,10 @@ contains
        enddo
     end if
     
-       
     call TotalBalanceCheck(currentSite,1)
 
-    if( hlm_use_ed_st3.eq.ifalse ) then 
+
+    if( hlm_use_ed_st3.eq.ifalse .and.hlm_use_sp.eq.ifalse ) then 
        currentPatch => currentSite%oldest_patch
        do while (associated(currentPatch))
           
@@ -248,22 +256,38 @@ contains
           currentPatch => currentPatch%younger
        enddo
     end if
-       
+
     call TotalBalanceCheck(currentSite,2)
 
     !*********************************************************************************
     ! Patch dynamics sub-routines: fusion, new patch creation (spwaning), termination.
     !*********************************************************************************
 
+    do_patch_dynamics = itrue
+    if(hlm_use_ed_st3.eq.ifalse)then
+      do_patch_dynamics = ifalse
+    end if
+  
+   if(hlm_use_nocomp.eq.itrue)then
+      ! n.b. the this is currently set to false to get around a memory leak that occurs
+      ! when we have multiple patches for each PFT. 
+      ! when this is fixed, we will need another option for 'one patch per PFT' vs 'multiple patches per PFT'
+      do_patch_dynamics = ifalse
+    end if
+
+    if(hlm_use_sp.eq.itrue)then ! cover for potential changes in nocomp logic above.  
+       do_patch_dynamics = ifalse
+    end if
+ 
     ! make new patches from disturbed land
-    if ( hlm_use_ed_st3.eq.ifalse ) then
+    if (do_patch_dynamics.eq.itrue ) then
        call spawn_patches(currentSite, bc_in)
     end if
-   
+
     call TotalBalanceCheck(currentSite,3)
 
     ! fuse on the spawned patches.
-    if ( hlm_use_ed_st3.eq.ifalse ) then
+    if ( do_patch_dynamics.eq.itrue ) then
        call fuse_patches(currentSite, bc_in )        
        
        ! If using BC FATES hydraulics, update the rhizosphere geometry
@@ -276,15 +300,16 @@ contains
        end if
     end if
 
+    ! SP has changes in leaf carbon but we don't expect them to be in balance. 
     call TotalBalanceCheck(currentSite,4)
 
     ! kill patches that are too small
-    if ( hlm_use_ed_st3.eq.ifalse ) then
+    if ( do_patch_dynamics.eq.itrue ) then
        call terminate_patches(currentSite)   
     end if
-   
-    call TotalBalanceCheck(currentSite,5)
 
+    call TotalBalanceCheck(currentSite,5)
+ 
   end subroutine ed_ecosystem_dynamics
 
   !-------------------------------------------------------------------------------!
@@ -637,12 +662,15 @@ contains
     ! !LOCAL VARIABLES:
     type (ed_patch_type) , pointer :: currentPatch   
     !-----------------------------------------------------------------------
-
-    call canopy_spread(currentSite)
+    if(hlm_use_sp.eq.ifalse)then
+      call canopy_spread(currentSite)
+    end if
 
     call TotalBalanceCheck(currentSite,6)
 
-    call canopy_structure(currentSite, bc_in)
+    if(hlm_use_sp.eq.ifalse)then
+       call canopy_structure(currentSite, bc_in)
+    endif
 
     call TotalBalanceCheck(currentSite,final_check_id)
 
@@ -676,8 +704,9 @@ contains
     ! If this is the second to last day of the year, then perform trimming
     if( hlm_day_of_year == hlm_days_per_year-1) then
 
-       write(fates_log(),*) 'calling trim canopy' 
-       call trim_canopy(currentSite)  
+     if(hlm_use_sp.eq.ifalse)then
+       call trim_canopy(currentSite)    
+     endif
     endif
 
   end subroutine ed_update_site
@@ -730,6 +759,8 @@ contains
                                                     ! to print cohort data
                                                     ! upon fail (lots of text)
     !-----------------------------------------------------------------------
+
+  if(hlm_use_sp.eq.ifalse)then
 
     change_in_stock = 0.0_r8
 
@@ -857,7 +888,7 @@ contains
       end if
 
    end do
-    
+  end if ! not SP mode    
   end subroutine TotalBalanceCheck
  
   ! =====================================================================================

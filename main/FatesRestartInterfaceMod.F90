@@ -7,7 +7,7 @@ module FatesRestartInterfaceMod
   use FatesConstantsMod,       only : fates_long_string_length
   use FatesConstantsMod,       only : itrue
   use FatesConstantsMod,       only : ifalse
-  use FatesConstantsMod,       only : fates_unset_r8
+  use FatesConstantsMod,       only : fates_unset_r8, fates_unset_int
   use FatesConstantsMod,       only : primaryforest
   use FatesGlobals,            only : fates_log
   use FatesGlobals,            only : endrun => fates_endrun
@@ -155,6 +155,7 @@ module FatesRestartInterfaceMod
   integer :: ir_area_pa
   integer :: ir_agesinceanthrodist_pa
   integer :: ir_patchdistturbcat_pa
+  integer :: ir_nocomp_pft_label_pa
 
   ! Litter Fluxes (needed to restart
   ! with nutrient dynamics on, restarting
@@ -895,6 +896,10 @@ contains
     call this%set_restart_var(vname='fates_patchdistturbcat', vtype=cohort_int, &
          long_name='Disturbance label of patch', units='yr', flushval = flushzero, &
          hlms='CLM:ALM', initialize=initialize_variables, ivar=ivar, index = ir_patchdistturbcat_pa )
+
+    call this%set_restart_var(vname='fates_nocomp_pft_label', vtype=cohort_int, &
+         long_name='PFT label of patch in nocomp mode', units='none', flushval = flushzero, &
+         hlms='CLM:ALM', initialize=initialize_variables, ivar=ivar, index = ir_nocomp_pft_label_pa )
 
     call this%set_restart_var(vname='fates_area', vtype=cohort_r8, &
          long_name='are of the ED patch', units='m2', flushval = flushzero, &
@@ -1654,6 +1659,7 @@ contains
            rio_age_pa                  => this%rvars(ir_age_pa)%r81d, &
            rio_patchdistturbcat_pa     => this%rvars(ir_patchdistturbcat_pa)%int1d, &           
            rio_agesinceanthrodist_pa   => this%rvars(ir_agesinceanthrodist_pa)%r81d, &           
+           rio_nocomp_pft_label_pa     => this%rvars(ir_nocomp_pft_label_pa)%int1d, &
            rio_area_pa                 => this%rvars(ir_area_pa)%r81d, &
            rio_watermem_siwm           => this%rvars(ir_watermem_siwm)%r81d, &
            rio_vegtempmem_sitm         => this%rvars(ir_vegtempmem_sitm)%r81d, &
@@ -1917,6 +1923,7 @@ contains
              rio_age_pa(io_idx_co_1st)         = cpatch%age
              rio_patchdistturbcat_pa(io_idx_co_1st)   = cpatch%anthro_disturbance_label
              rio_agesinceanthrodist_pa(io_idx_co_1st) = cpatch%age_since_anthro_disturbance
+             rio_nocomp_pft_label_pa(io_idx_co_1st)= cpatch%nocomp_pft_label
              rio_area_pa(io_idx_co_1st)        = cpatch%area
              
              ! set cohorts per patch for IO
@@ -2154,7 +2161,7 @@ contains
      integer                           :: ft
      integer                           :: el            ! element loop counter
      integer, parameter                :: recruitstatus = 0
-
+     integer                           ::  nocomp_pft ! PFT patch label for nocomp mode
      ! ----------------------------------------------------------------------------------
      ! We really only need the counts for the number of patches per site
      ! and the number of cohorts per patch. These values tell us how much
@@ -2191,9 +2198,10 @@ contains
              
              ! create patch
              allocate(newp)    
-             
+             nocomp_pft = fates_unset_int             
+             ! the nocomp_pft label is set after patch creation has occured in 'get_restart_vectors'
              ! make new patch
-             call create_patch(sites(s), newp, fates_unset_r8, fates_unset_r8, primaryforest )
+             call create_patch(sites(s), newp, fates_unset_r8, fates_unset_r8, primaryforest, nocomp_pft )
 
              ! Initialize the litter pools to zero, these
              ! pools will be populated by looping over the existing patches
@@ -2442,6 +2450,7 @@ contains
           rio_age_pa                  => this%rvars(ir_age_pa)%r81d, &
           rio_patchdistturbcat_pa     => this%rvars(ir_patchdistturbcat_pa)%int1d,  &
           rio_agesinceanthrodist_pa   => this%rvars(ir_agesinceanthrodist_pa)%r81d, &
+          rio_nocomp_pft_label_pa     => this%rvars(ir_nocomp_pft_label_pa)%int1d, &
           rio_area_pa                 => this%rvars(ir_area_pa)%r81d, &
           rio_watermem_siwm           => this%rvars(ir_watermem_siwm)%r81d, &
           rio_vegtempmem_sitm         => this%rvars(ir_vegtempmem_sitm)%r81d, &
@@ -2689,6 +2698,7 @@ contains
              cpatch%age                = rio_age_pa(io_idx_co_1st)
              cpatch%anthro_disturbance_label       = rio_patchdistturbcat_pa(io_idx_co_1st)
              cpatch%age_since_anthro_disturbance   = rio_agesinceanthrodist_pa(io_idx_co_1st)
+             cpatch%nocomp_pft_label               = rio_nocomp_pft_label_pa(io_idx_co_1st)
              cpatch%area               = rio_area_pa(io_idx_co_1st)
              cpatch%age_class          = get_age_class_index(cpatch%age)
 
@@ -2912,6 +2922,7 @@ contains
         ifp = 0
         currentpatch => sites(s)%oldest_patch
         do while (associated(currentpatch))  
+          if(currentpatch%nocomp_pft_label.gt.0)then
            ifp = ifp+1
            
            currentPatch%f_sun      (:,:,:) = 0._r8
@@ -2976,7 +2987,7 @@ contains
               
            end if    ! if the vegetation and zenith filter is active
      
-
+         end if ! not bare ground
            currentPatch => currentPatch%younger
         end do       ! Loop linked-list patches
      enddo           ! Loop Sites

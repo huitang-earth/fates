@@ -410,7 +410,7 @@ module EDTypesMod
      integer  ::  ncl_p                                            ! Number of occupied canopy layers
      integer  ::  anthro_disturbance_label                         ! patch label for anthropogenic disturbance classification
      real(r8) ::  age_since_anthro_disturbance                     ! average age for secondary forest since last anthropogenic disturbance
-
+     integer  ::  nocomp_pft_label                                 ! where nocomp is active, use this label for patch ID.   
      ! LEAF ORGANIZATION
      real(r8) ::  pft_agb_profile(maxpft,n_dbh_bins)            ! binned above ground biomass, for patch fusion: KgC/m2
      real(r8) ::  canopy_layer_tlai(nclmax)                     ! total leaf area index of each canopy layer
@@ -693,6 +693,13 @@ module EDTypesMod
      real(r8), allocatable :: area_PFT(:)                      ! Area allocated to individual PFTs    
      integer, allocatable  :: use_this_pft(:)                  ! Is area_PFT > 0 ? (1=yes, 0=no)
  
+     ! SP mode target PFT level variables
+     real(r8), allocatable :: sp_tlai(:)                      ! target TLAI per FATES pft
+     real(r8), allocatable :: sp_tsai(:)                      ! target TSAI per FATES pft
+     real(r8), allocatable :: sp_htop(:)                      ! target HTOP per FATES pft
+     
+     real(r8) :: area_bareground                               ! in SP mode we assert a bare ground fraction
+
      ! Mass Balance (allocation for each element)
 
      type(site_massbal_type), pointer :: mass_balance(:)

@@ -209,7 +209,10 @@ module EDPftvarcon
      real(r8), allocatable :: hydr_fcap_node(:,:)   ! fraction of (1-resid_node) that is capillary in source
      real(r8), allocatable :: hydr_pinot_node(:,:)  ! osmotic potential at full turgor
      real(r8), allocatable :: hydr_kmax_node(:,:)   ! maximum xylem conductivity per unit conducting xylem area
-     
+
+     ! fixed biogeog mode parameter(s)
+     real(r8), allocatable :: hlm_pft_map(:,:)           ! Mapping from HLM PFTs to FATES PFTs in fixed biogeog mode.    
+
    contains
      procedure, public :: Init => EDpftconInit
      procedure, public :: Register
@@ -262,7 +265,7 @@ contains
     call this%Register_PFT_numrad(fates_params)
     call this%Register_PFT_hydr_organs(fates_params)
     call this%Register_PFT_leafage(fates_params)
-    
+
   end subroutine Register
 
   !-----------------------------------------------------------------------
@@ -287,6 +290,7 @@ contains
 
     use FatesParametersInterface, only : fates_parameters_type, param_string_length
     use FatesParametersInterface, only : dimension_name_pft, dimension_shape_1d
+    use FatesParametersInterface, only : dimension_name_hlm_pftno, dimension_shape_2d
 
     implicit none
 
@@ -294,6 +298,7 @@ contains
     class(fates_parameters_type), intent(inout) :: fates_params
 
     character(len=param_string_length), parameter :: dim_names(1) = (/dimension_name_pft/)
+    character(len=param_string_length) :: pftmap_dim_names(2) 
 
     integer, parameter :: dim_lower_bound(1) = (/ lower_bound_pft /)
 
@@ -618,7 +623,14 @@ contains
     name = 'fates_prescribed_puptake'
     call fates_params%RegisterParameter(name=name, dimension_shape=dimension_shape_1d, &
           dimension_names=dim_names, lower_bounds=dim_lower_bound)    
-  
+
+    ! adding the hlm_pft_map variable with two dimensions - FATES PFTno and HLM PFTno
+    pftmap_dim_names(1) = dimension_name_pft 
+    pftmap_dim_names(2) = dimension_name_hlm_pftno 
+
+    name = 'fates_hlm_pft_map'
+    call fates_params%RegisterParameter(name=name, dimension_shape=dimension_shape_2d, &                                           dimension_names=pftmap_dim_names, lower_bounds=dim_lower_bound)
+
   end subroutine Register_PFT
 
   !-----------------------------------------------------------------------
@@ -959,6 +971,10 @@ contains
     call fates_params%RetreiveParameterAllocate(name=name, &
          data=this%eca_lambda_ptase)
 
+    name = 'fates_hlm_pft_map' 
+    call fates_params%RetreiveParameterAllocate(name=name, &
+         data=this%hlm_pft_map)
+    
   end subroutine Receive_PFT
 
   !-----------------------------------------------------------------------
@@ -1155,6 +1171,9 @@ contains
 
     return
   end subroutine Register_PFT_leafage
+
+
+
 
   ! =====================================================================================
 
@@ -1386,6 +1405,8 @@ contains
         write(fates_log(),fmt0) 'hydr_fcap_node = ',EDPftvarcon_inst%hydr_fcap_node
         write(fates_log(),fmt0) 'hydr_pinot_node = ',EDPftvarcon_inst%hydr_pinot_node
         write(fates_log(),fmt0) 'hydr_kmax_node = ',EDPftvarcon_inst%hydr_kmax_node
+
+        write(fates_log(),fmt0) 'hlm_pft_map = ', EDPftvarcon_inst%hlm_pft_map
         write(fates_log(),*) '-------------------------------------------------'
 
      end if
@@ -1409,6 +1430,7 @@ contains
     use FatesConstantsMod  , only : fates_check_param_set
     use FatesConstantsMod  , only : itrue, ifalse
     use EDParamsMod        , only : logging_mechanical_frac, logging_collateral_frac, logging_direct_frac
+    use FatesInterfaceTypesMod         , only : hlm_use_fixed_biogeog
     
      ! Argument
      logical, intent(in) :: is_master    ! Only log if this is the master proc
@@ -1420,6 +1442,10 @@ contains
      integer :: nleafage ! size of the leaf age class array
      integer :: iage     ! leaf age class index
      integer :: norgans  ! size of the plant organ dimension
+     integer  :: hlm_pft    ! used in fixed biogeog mode
+     integer  :: fates_pft  ! used in fixed biogeog mode
+
+     real(r8) :: sumarea    ! area of PFTs in nocomp mode.
 
      npft = size(EDPftvarcon_inst%freezetol,1)
 
@@ -1667,7 +1693,21 @@ contains
 
         end if
 
-     end do
+        ! check that the host-fates PFT map adds to one along HLM dimension so that all the HLM area 
+        ! goes to a FATES PFT.  Each FATES PFT can get < or > 1 of an HLM PFT.
+        do hlm_pft = 1,size( EDPftvarcon_inst%hlm_pft_map,2)
+          sumarea = sum(EDPftvarcon_inst%hlm_pft_map(1:npft,hlm_pft))
+          if(abs(sumarea-1.0_r8).gt.nearzero)then
+            write(fates_log(),*) 'The distribution of this host land model PFT :',hlm_pft
+            write(fates_log(),*) 'into FATES PFTs, does not add up to 1.0.'
+            write(fates_log(),*) 'Error is:',sumarea-1.0_r8
+            write(fates_log(),*) 'and the hlm_pft_map is:', EDPftvarcon_inst%hlm_pft_map(1:npft,hlm_pft)  
+            write(fates_log(),*) 'Aborting'
+            call endrun(msg=errMsg(sourcefile, __LINE__))
+           end if 
+         end do !hlm_pft 
+       end do !ipft
+
 
 !!    ! Checks for HYDRO
 !!    if( hlm_use_planthydro == itrue ) then
