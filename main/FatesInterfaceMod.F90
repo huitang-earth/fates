@@ -442,6 +442,7 @@ contains
       allocate(bc_in%t_veg_pa(maxPatchesPerSite))
       allocate(bc_in%tgcm_pa(maxPatchesPerSite))
       allocate(bc_in%t_soisno_sl(nlevsoil_in))
+      allocate(bc_in%fwet_pa(maxPatchesPerSite))
 
       ! Canopy Radiation
       allocate(bc_in%filter_vegzen_pa(maxPatchesPerSite))
@@ -476,7 +477,7 @@ contains
          allocate(bc_in%hlm_harvest_catnames(0))
       end if
 
-      allocate(bc_in%pft_areafrac(maxpft))
+      allocate(bc_in%pft_areafrac(0:maxpft))
 
       ! Variables for SP mode. 
       if(hlm_use_sp.eq.itrue) then
