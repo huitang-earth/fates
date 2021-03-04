@@ -140,6 +140,7 @@ contains
                 else
 
                    call PatchNormanRadiation (currentPatch, &
+                        bc_in(s)%fwet_pa(ifp),              &  ! in
                         bc_out(s)%albd_parb(ifp,:), &
                         bc_out(s)%albi_parb(ifp,:), &
                         bc_out(s)%fabd_parb(ifp,:), &
@@ -164,6 +165,7 @@ contains
   ! ======================================================================================
 
   subroutine PatchNormanRadiation (currentPatch, &
+       fwet,          &   ! (ifp)
        albd_parb_out, &   ! (ifp,ib)
        albi_parb_out, &   ! (ifp,ib)
        fabd_parb_out, &   ! (ifp,ib)
@@ -188,6 +190,7 @@ contains
     ! -----------------------------------------------------------------------------------
 
     type(ed_patch_type), intent(inout), target :: currentPatch
+    real(r8), intent(in)    :: fwet   ! vegetation intercepted water fraction
     real(r8), intent(inout) :: albd_parb_out(hlm_numSWb)
     real(r8), intent(inout) :: albi_parb_out(hlm_numSWb)
     real(r8), intent(inout) :: fabd_parb_out(hlm_numSWb)
@@ -221,6 +224,8 @@ contains
     real(r8) :: Dif_up(nclmax,maxpft,nlevleaf)           ! Upward diffuse flux above canopy layer J (W/m**2 ground area)
     real(r8) :: lai_change(nclmax,maxpft,nlevleaf)       ! Forward diffuse flux onto canopy layer J (W/m**2 ground area)
     real(r8) :: f_not_abs(maxpft,maxSWb)                   ! Fraction reflected + transmitted. 1-absorbtion.
+    real(r8) :: rhol(maxpft,maxSWb)                    ! leaf reflectance
+    real(r8) :: taul(maxpft,maxSWb)                    ! leaf transmittance  
     real(r8) :: Abs_dir_z(maxpft,nlevleaf)
     real(r8) :: Abs_dif_z(maxpft,nlevleaf)
     real(r8) :: abs_rad(maxSWb)                               !radiation absorbed by soil
@@ -253,9 +258,9 @@ contains
 
 
     associate(&
-         rhol         =>    EDPftvarcon_inst%rhol                     , & ! Input:  [real(r8) (:)   ] leaf reflectance: 1=vis, 2=nir
+!         rhol         =>    EDPftvarcon_inst%rhol                     , & ! Input:  [real(r8) (:)   ] leaf reflectance: 1=vis, 2=nir
          rhos         =>    EDPftvarcon_inst%rhos                     , & ! Input:  [real(r8) (:)   ] stem reflectance: 1=vis, 2=nir
-         taul         =>    EDPftvarcon_inst%taul                     , & ! Input:  [real(r8) (:)   ] leaf transmittance: 1=vis, 2=nir
+!         taul         =>    EDPftvarcon_inst%taul                     , & ! Input:  [real(r8) (:)   ] leaf transmittance: 1=vis, 2=nir
          taus         =>    EDPftvarcon_inst%taus                     , & ! Input:  [real(r8) (:)   ] stem transmittance: 1=vis, 2=nir
          xl           =>    EDPftvarcon_inst%xl                       , & ! Input:  [real(r8) (:)   ] ecophys const - leaf/stem orientation index
          clumping_index  => EDPftvarcon_inst%clumping_index) 
@@ -275,7 +280,7 @@ contains
     refl_dif(:,:,:,:)    = 0.0_r8
     tran_dif(:,:,:,:)    = 0.0_r8
     dif_ratio(:,:,:,:)   = 0.0_r8
-
+    
 
     ! Initialize the ouput arrays
     ! ---------------------------------------------------------------------------------
@@ -503,6 +508,15 @@ contains
                    ! Leaf scattering coefficient and terms do diffuse radiation reflected
                    ! and transmitted by a layer
                    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
+      ! Hui: add influence of water content on albedo, need to check if this way of assign values work.
+                  if (EDPftvarcon_inst%stomatal_model(ft) >= 3) then 
+                       rhol(ft,ib)=EDPftvarcon_inst%rhol(ft,ib) - 0.5 * EDPftvarcon_inst%rhol(ft,ib) * fwet
+                       taul(ft,ib)=EDPftvarcon_inst%taul(ft,ib) - 0.5 * EDPftvarcon_inst%rhol(ft,ib) * fwet 
+                  else 
+                       taul(ft,ib)=EDPftvarcon_inst%taul(ft,ib) 
+                       rhol(ft,ib)=EDPftvarcon_inst%rhol(ft,ib)
+                  end if
+                   
                    f_not_abs(ft,ib) = rhol(ft,ib) + taul(ft,ib) !leaf level fraction NOT absorbed.
                    !tr_dif_z is a term that uses the LAI in each layer, whereas rhol and taul do not,
                    !because they are properties of leaf surfaces and not of the leaf matrix.
