@@ -140,6 +140,8 @@ contains
 
              do ft = 1,numpft
 
+! Hui: Add a pft filter to avoid calculating btran for moss and lichen
+! Hui: since root fraction is set to 0, btran should be 0 for moss and lichen, no need to modify here. 
                 call set_root_fraction(sites(s)%rootfrac_scr, ft, sites(s)%zi_soil ) 
 
                 cpatch%btran_ft(ft) = 0.0_r8
