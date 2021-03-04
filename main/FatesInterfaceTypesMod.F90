@@ -427,6 +427,9 @@ module FatesInterfaceTypesMod
 
       ! soil temperature (Kelvin)
       real(r8), allocatable :: t_soisno_sl(:)
+      
+      ! vegetation water fraction
+      real(r8), allocatable :: fwet_pa(:) 
 
       ! Canopy Radiation Boundaries
       ! ---------------------------------------------------------------------------------
@@ -462,6 +465,7 @@ module FatesInterfaceTypesMod
 
       real(r8) :: snow_depth_si    ! Depth of snow in snowy areas of site (m)
       real(r8) :: frac_sno_eff_si  ! Fraction of ground covered by snow (0-1)
+      
 
       ! Hydrology variables for BTRAN
       ! ---------------------------------------------------------------------------------
