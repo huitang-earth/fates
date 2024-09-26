@@ -30,6 +30,7 @@ module EDCanopyStructureMod
   use FatesInterfaceTypesMod     , only : hlm_use_cohort_age_tracking
   use FatesInterfaceTypesMod     , only : hlm_use_sp
   use FatesInterfaceTypesMod     , only : numpft
+  use FatesInterfaceTypesMod , only : hlm_use_mosslichen, hlm_use_mosslichen_undersnow
   use FatesPlantHydraulicsMod, only : UpdateH2OVeg,InitHydrCohort, RecruitWaterStorage
   use EDTypesMod            , only : maxCohortsPerPatch
   use PRTGenericMod,          only : leaf_organ
@@ -1606,7 +1607,7 @@ contains
                         currentCohort%sai
 
                    !snow burial
-!Hui: snow burial is taken care in FATES, not in CLM. should modify FATES instead of CLM
+                   !Hui: snow burial is taken care in FATES, not in CLM. should modify FATES instead of CLM
                    !write(fates_log(), *) 'calc snow'
                    snow_depth_avg = snow_depth_si * frac_sno_eff_si
                    if(snow_depth_avg  > maxh(iv))then
@@ -1705,7 +1706,7 @@ contains
                    ! We calculate the absolute elevation of each layer to help determine if the layer
                    ! is obscured by snow.
 
-! Hui: snow burial for moss and lichen, moss totally buried, lichen similar to other pft
+                   ! Hui: snow burial for moss and lichen, moss totally buried, lichen similar to other pft
 
                    if ( EDPftvarcon_inst%stomatal_model(ft) == 3 ) then
                        print *, "moss 3"
@@ -1737,7 +1738,10 @@ contains
 
 ! Hui: allow snow burial in this option; for vegetation under snow, snow burial needs to be treated in a different way.
                    ! =========== OVER-WRITE =================
+                   !if ((hlm_use_mosslichen_undersnow.eq.itrue .or. ((hlm_use_mosslichen_undersnow.eq.2).and.(bc_in(s)%snow_depth_si>0.05))) .and. EDPftvarcon_inst%stomatal_model(ft) >= 3 ) then
+                    if ((hlm_use_mosslichen_undersnow.eq.itrue .or. hlm_use_mosslichen_undersnow.eq.2) .and. EDPftvarcon_inst%stomatal_model(ft) >= 3 ) then
                           fraction_exposed= 1.0_r8
+                   end if
                    ! =========== OVER-WRITE =================
 
                    if(iv==currentCohort%NV) then

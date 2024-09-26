@@ -29,6 +29,7 @@ module FATESPlantRespPhotosynthMod
   use FatesInterfaceTypesMod, only : hlm_parteh_mode
   use FatesInterfaceTypesMod, only : numpft
   use FatesInterfaceTypesMod, only : nleafage
+  use FatesInterfaceTypesMod , only : hlm_use_mosslichen, hlm_use_mosslichen_photosyn, hlm_use_mosslichen_undersnow
   use EDTypesMod,        only : maxpft
   use EDTypesMod,        only : nlevleaf
   use EDTypesMod,        only : nclmax
@@ -271,7 +272,7 @@ contains
        allocate(rootfr_ft(numpft, bc_in(s)%nlevsoil))
 
        do ft = 1,numpft
-         if (EDPftvarcon_inst%stomatal_model(ft) >= 3) then
+         if (hlm_use_mosslichen.eq.itrue .and. EDPftvarcon_inst%stomatal_model(ft) >= 3) then
             rootfr_ft(ft,:) = 0.0_r8
          else
            call set_root_fraction(rootfr_ft(ft,:), ft, &
@@ -320,9 +321,10 @@ contains
                 !  CO2 compensation point (Pa)
                 !  leaf boundary layer conductance of h20
                 !  constrained vapor pressure
-                call GetCanopyGasParameters(bc_in(s)%forc_pbot,       & ! in
+                if ( hlm_use_mosslichen_photosyn.eq.3) then ! Hui: Problematic if one patch have multi-pfts
+                   call GetCanopyGasParameters(bc_in(s)%forc_pbot,       & ! in
                      bc_in(s)%oair_pa(ifp),    & ! in
-                     bc_in(s)%t_soisno_sl(1),   & ! in
+                     bc_in(s)%t_moss_pa(ifp),   & ! in
                      bc_in(s)%tgcm_pa(ifp),    & ! in
                      bc_in(s)%eair_pa(ifp),    & ! in
                      bc_in(s)%esat_tv_pa(ifp), & ! in
@@ -333,9 +335,21 @@ contains
                      cf,                       & ! out
                      gb_mol,                   & ! out
                      ceair)                      ! out
-
-
-
+                else
+                   call GetCanopyGasParameters(bc_in(s)%forc_pbot,       & ! in
+                    bc_in(s)%oair_pa(ifp),    & ! in
+                    bc_in(s)%t_veg_pa(ifp),   & ! in
+                    bc_in(s)%tgcm_pa(ifp),    & ! in
+                    bc_in(s)%eair_pa(ifp),    & ! in
+                    bc_in(s)%esat_tv_pa(ifp), & ! in
+                    bc_in(s)%rb_pa(ifp),      & ! in
+                    mm_kco2,                  & ! out              
+                    mm_ko2,                   & ! out
+                    co2_cpoint,               & ! out
+                    cf,                       & ! out
+                    gb_mol,                   & ! out
+                    ceair)                      ! out
+                end if
 
                 ! ------------------------------------------------------------------------
                 ! Part VI: Loop over all leaf layers.
@@ -483,11 +497,20 @@ contains
 
 
                                ! Part VII: Calculate dark respiration (leaf maintenance) for this layer
-                               call LeafLayerMaintenanceRespiration( lmr25top,                 &  ! in
-                                    nscaler,                  &  ! in
-                                    ft,                       &  ! in
-                                    bc_in(s)%t_soisno_sl(1),   &  ! in
-                                    lmr_z(iv,ft,cl))             ! out
+                               if ( hlm_use_mosslichen_photosyn.eq.3 .and. stomatal_model(ft) >= 3 ) then
+                                 call LeafLayerMaintenanceRespiration( lmr25top,                 &  ! in
+                                      nscaler,                  &  ! in
+                                      ft,                       &  ! in
+                                      bc_in(s)%t_moss_pa(ifp),   &  ! in
+                                      lmr_z(iv,ft,cl))             ! out
+                               else
+                                 call LeafLayerMaintenanceRespiration( lmr25top,                 &  ! in
+                                      nscaler,                  &  ! in
+                                      ft,                       &  ! in
+                                      bc_in(s)%t_veg_pa(ifp),   &  ! in
+                                      lmr_z(iv,ft,cl))             ! out
+                               end if
+                               
 
                                ! Part VII: Calculate (1) maximum rate of carboxylation (vcmax), 
                                ! (2) maximum electron transport rate, (3) triose phosphate 
@@ -500,26 +523,42 @@ contains
                                ! into consideration.
 
 
-
-                               call LeafLayerBiophysicalRates(currentPatch%ed_parsun_z(cl,ft,iv), &  ! in
+                               if ( hlm_use_mosslichen_photosyn.eq.3 .and. stomatal_model(ft) >= 3 ) then
+                                  call LeafLayerBiophysicalRates(currentPatch%ed_parsun_z(cl,ft,iv), &  ! in
                                     ft,                                 &  ! in
                                     currentCohort%vcmax25top,           &  ! in
                                     currentCohort%jmax25top,            &  ! in
                                     currentCohort%tpu25top,             &  ! in
                                     currentCohort%kp25top,              &  ! in
                                     nscaler,                            &  ! in
-                                    bc_in(s)%t_soisno_sl(1),             &  ! in
+                                    bc_in(s)%t_moss_pa(ifp),             &  ! in
                                     bc_in(s)%fwet_pa(ifp),              &  ! in
                                     btran_eff,                          &  ! in
                                     vcmax_z,                            &  ! out
                                     jmax_z,                             &  ! out
                                     tpu_z,                              &  ! out
                                     kp_z )                                 ! out
+                               else
+                                 call LeafLayerBiophysicalRates(currentPatch%ed_parsun_z(cl,ft,iv), &  ! in
+                                   ft,                                 &  ! in
+                                   currentCohort%vcmax25top,           &  ! in
+                                   currentCohort%jmax25top,            &  ! in
+                                   currentCohort%tpu25top,             &  ! in
+                                   currentCohort%kp25top,              &  ! in
+                                   nscaler,                            &  ! in
+                                   bc_in(s)%t_veg_pa(ifp),             &  ! in
+                                   bc_in(s)%fwet_pa(ifp),              &  ! in
+                                   btran_eff,                          &  ! in
+                                   vcmax_z,                            &  ! out
+                                   jmax_z,                             &  ! out
+                                   tpu_z,                              &  ! out
+                                   kp_z )                                 ! out
+                               end if 
 
                                ! Part IX: This call calculates the actual photosynthesis for the 
                                ! leaf layer, as well as the stomatal resistance and the net assimilated carbon.
-
-                               call LeafLayerPhotosynthesis(currentPatch%f_sun(cl,ft,iv),    &  ! in
+                               if ( hlm_use_mosslichen_photosyn.eq.3 .and. stomatal_model(ft) >= 3 ) then
+                                  call LeafLayerPhotosynthesis(currentPatch%f_sun(cl,ft,iv),    &  ! in
                                     currentPatch%ed_parsun_z(cl,ft,iv), &  ! in
                                     currentPatch%ed_parsha_z(cl,ft,iv), &  ! in
                                     currentPatch%ed_laisun_z(cl,ft,iv), &  ! in
@@ -530,7 +569,7 @@ contains
                                     jmax_z,                             &  ! in
                                     tpu_z,                              &  ! in
                                     kp_z,                               &  ! in
-                                    bc_in(s)%t_soisno_sl(1),             &  ! in
+                                    bc_in(s)%t_moss_pa(ifp),             &  ! in
                                     bc_in(s)%esat_tv_pa(ifp),           &  ! in
                                     bc_in(s)%forc_pbot,                 &  ! in
                                     bc_in(s)%cair_pa(ifp),              &  ! in
@@ -549,6 +588,38 @@ contains
                                     rs_z(iv,ft,cl),                     &  ! out
                                     anet_av_z(iv,ft,cl),                &  ! out
                                     c13disc_z(cl,ft,iv))                   ! out
+                                else
+                                   call LeafLayerPhotosynthesis(currentPatch%f_sun(cl,ft,iv),    &  ! in
+                                    currentPatch%ed_parsun_z(cl,ft,iv), &  ! in
+                                    currentPatch%ed_parsha_z(cl,ft,iv), &  ! in
+                                    currentPatch%ed_laisun_z(cl,ft,iv), &  ! in
+                                    currentPatch%ed_laisha_z(cl,ft,iv), &  ! in
+                                    currentPatch%canopy_area_profile(cl,ft,iv), &  ! in
+                                    ft,                                 &  ! in
+                                    vcmax_z,                            &  ! in
+                                    jmax_z,                             &  ! in
+                                    tpu_z,                              &  ! in
+                                    kp_z,                               &  ! in
+                                    bc_in(s)%t_veg_pa(ifp),             &  ! in
+                                    bc_in(s)%esat_tv_pa(ifp),           &  ! in
+                                    bc_in(s)%forc_pbot,                 &  ! in
+                                    bc_in(s)%cair_pa(ifp),              &  ! in
+                                    bc_in(s)%oair_pa(ifp),              &  ! in
+                                    bc_in(s)%fwet_pa(ifp),              &  ! in
+                                    btran_eff,                          &  ! in
+                                    stomatal_intercept_btran,           &  ! in
+                                    cf,                                 &  ! in
+                                    gb_mol,                             &  ! in
+                                    ceair,                              &  ! in
+                                    mm_kco2,                            &  ! in
+                                    mm_ko2,                             &  ! in
+                                    co2_cpoint,                         &  ! in
+                                    lmr_z(iv,ft,cl),                    &  ! in
+                                    currentPatch%psn_z(cl,ft,iv),       &  ! out
+                                    rs_z(iv,ft,cl),                     &  ! out
+                                    anet_av_z(iv,ft,cl),                &  ! out
+                                    c13disc_z(cl,ft,iv))                   ! out
+                                end if
 
                                rate_mask_z(iv,ft,cl) = .true.
                             end if
@@ -715,7 +786,7 @@ contains
 
                       ! add on whole plant respiration values in kgC/indiv/s-1  
                       
-                      if ( stomatal_model(ft) >= 3 ) then
+                      if ( hlm_use_mosslichen.eq.itrue .and. stomatal_model(ft) >= 3 ) then
                       currentCohort%resp_m = currentCohort%livestem_mr                     
                       else
                       currentCohort%resp_m = currentCohort%livestem_mr + &
@@ -1160,9 +1231,10 @@ subroutine LeafLayerPhotosynthesis(f_sun_lsl,         &  ! in
 
                  call quadratic_f (aquad, bquad, cquad, r1, r2)
                  gs_mol = max(r1,r2)
-              else if ( stomatal_model(ft) >= 3 ) then         !stomatal conductance calculated from Ball et al. (1987)                     
+              else if ( stomatal_model(ft) == 3 ) then         !moss and lichen photosynthesis without stomatal control (default, https://doi.org/10.5194/bg-10-6989-2013)                      
                  print *, "moss or lichen 4"           
-                 gs_mol = stomatal_intercept_btran                               
+                 gs_mol = stomatal_intercept_btran
+!             else if ( stomatal_model(ft) == 4 ) then        !moss and lichen photosynthesis with explicit treatment of Mesophyll conductance (not implemented yet, https://doi.org/10.1111/nph.15675; https://doi.org/10.1111/tpj.14587)
               end if
                             
 !BHui Another option for moss and lichen without a water stress       
@@ -1186,12 +1258,12 @@ subroutine LeafLayerPhotosynthesis(f_sun_lsl,         &  ! in
 !                 wco2=12
 !                 diffuse_co2=(wmax-wmin)(1.0-fwet)**wco2 + wmin 
               print *, "check3=", stomatal_model(ft)                         
-              if ( stomatal_model(ft) >= 3 ) then             
-                 !co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / (gb_mol*max((max(1.0-fwet,0.1))**12,0.000001))
-                 co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / gb_mol 
+              if ( stomatal_model(ft) == 3 ) then             
+                 co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / (gb_mol*max((max(1.0-fwet,0.1))**12,0.000001))
+!                 co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / gb_mol 
 !  Alternative
 !                co2_inter_c = ((max(1.0-fwet,0.01))**12) * (can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / gb_mol)
-                 
+              !else if ( stomatal_model(ft) == 4 ) then
               else                  
                  ! Derive new estimate for co2_inter_c                 
                  co2_inter_c = can_co2_ppress - anet * can_press * &
@@ -1224,12 +1296,12 @@ subroutine LeafLayerPhotosynthesis(f_sun_lsl,         &  ! in
 !BHui Modify co_inter_c is dependent on CO2 diffusivity related to water saturation
 ! "h2o_co2_stoma_diffuse_ratio" is dependent on water content?
 ! gs_mol is 1?
-          if ( stomatal_model(ft) >= 3 ) then            
-             ! co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / (gb_mol*max((max(1.0-fwet,0.1))**12,0.000001))
-             co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / gb_mol       
+          if ( stomatal_model(ft) == 3 ) then            
+             co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / (gb_mol*max((max(1.0-fwet,0.1))**12,0.000001))
+!            co2_inter_c = can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / gb_mol       
 !  Alternative
 !             co2_inter_c = ((max(1.0-fwet,0.01))**12) * (can_co2_ppress - anet * can_press * h2o_co2_bl_diffuse_ratio / gb_mol)
-                 
+          !else if ( stomatal_model(ft) == 4 ) then
           else                  
               co2_inter_c = can_co2_ppress - anet * can_press * &
                 (h2o_co2_bl_diffuse_ratio*gs_mol+h2o_co2_stoma_diffuse_ratio*gb_mol) / (gb_mol*gs_mol)
@@ -2025,10 +2097,11 @@ end if
 ! Adjust for water limitations
 
 ! EHui, btran should be changed to fwet to affect photosynthesis 
-    if (EDPftvarcon_inst%stomatal_model(ft) >= 3) then
-      vcmax = vcmax   !* min(1.0, fwet/0.6)   ! According to Porada et al. 2013, threshhold saturation is set to 0.6
+    if (hlm_use_mosslichen.eq.itrue .and. EDPftvarcon_inst%stomatal_model(ft) >= 3) then
+!      vcmax = vcmax   !* min(1.0, fwet/0.6)   ! According to Porada et al. 2013, threshhold saturation is set to 0.6
+       vcmax = vcmax * min(1.0, fwet/0.6)
     else
-      vcmax = vcmax * btran
+       vcmax = vcmax * btran
     end if
 return
 end subroutine LeafLayerBiophysicalRates
