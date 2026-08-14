@@ -180,9 +180,12 @@ contains
                                                  ! (umol electrons/m**2/s)
     real(r8) :: kp_z                             ! leaf layer initial slope of CO2 response
                                                  ! curve (C4 plants)
-    real(r8) :: mm_kco2                          ! Michaelis-Menten constant for CO2 (Pa)
-    real(r8) :: mm_ko2                           ! Michaelis-Menten constant for O2 (Pa)
-    real(r8) :: co2_cpoint                       ! CO2 compensation point (Pa)
+    real(r8) :: mm_kco2_vasc                     ! Michaelis-Menten constant for CO2 (Pa) for vascular plants
+    real(r8) :: mm_ko2_vasc                      ! Michaelis-Menten constant for O2 (Pa) for vascular plants
+    real(r8) :: co2_cpoint_vasc                  ! CO2 compensation point (Pa) for vascular plants
+    real(r8) :: mm_kco2_cohort                   ! Michaelis-Menten constant for CO2 (Pa) for cohort
+    real(r8) :: mm_ko2_cohort                    ! Michaelis-Menten constant for O2 (Pa) for cohort
+    real(r8) :: co2_cpoint_cohort                ! CO2 compensation point (Pa) for cohort
     real(r8) :: btran_eff                        ! effective transpiration wetness factor (0 to 1)
     real(r8) :: kn                               ! leaf nitrogen decay coefficient
     real(r8) :: gb_mol                           ! leaf boundary layer conductance (molar form: [umol /m**2/s])
@@ -383,26 +386,14 @@ contains
                   !  leaf boundary layer conductance of h20
                   !  constrained vapor pressure
 
-                  ! [PORTED by Hui Tang: use NVP surface temperature for gas parameters when
-                  !  patch contains NVP cohorts; walk cohort list to detect NVP presence]
-                  t_cohort = bc_in(s)%t_veg_pa(ifp)
-                  if (hlm_use_nvp == itrue) then
-                     currentCohort => currentPatch%tallest
-                     do while (associated(currentCohort))
-                        if (currentCohort%nvp_dz > nearzero) then
-                           t_cohort = bc_in(s)%t_nvp_pa(ifp)
-                           exit
-                        end if
-                        currentCohort => currentCohort%shorter
-                     end do
-                  end if
-
+                  ! Get canopy gas parameters for vascular plants;
+                  ! we will get NVP parameters later if needed.
                   call GetCanopyGasParameters(bc_in(s)%forc_pbot,       & ! in
                        bc_in(s)%oair_pa(ifp),    & ! in
-                       t_cohort,                  & ! in  [PORTED: NVP or veg temperature]
-                       mm_kco2,                  & ! out
-                       mm_ko2,                   & ! out
-                       co2_cpoint)
+                       bc_in(s)%t_veg_pa(ifp),   & ! in
+                       mm_kco2_vasc,             & ! out
+                       mm_ko2_vasc,              & ! out
+                       co2_cpoint_vasc)
 
                   ! The host models use velocity based conductances and resistance
                   ! this is the factor that converts a conductance from
@@ -440,17 +431,29 @@ contains
                      currentCohort => currentPatch%tallest
                      do_cohort_drive: do while (associated(currentCohort)) ! Cohort loop
 
+                        ! Get environmental conditions and gas parameters.
+                        ! Default to vascular values:
+                        t_cohort = bc_in(s)%t_veg_pa(ifp)
+                        mm_kco2_cohort = mm_kco2_vasc
+                        mm_ko2_cohort = mm_ko2_vasc
+                        co2_cpoint_cohort = co2_cpoint_vasc
+                        ! Change to NVP values if needed:
+                        if (hlm_use_nvp == itrue) then
+                           if (currentCohort%nvp_dz > nearzero) then
+                              t_cohort = bc_in(s)%t_nvp_pa(ifp)
+                              call GetCanopyGasParameters(bc_in(s)%forc_pbot,       & ! in
+                                   bc_in(s)%oair_pa(ifp),    & ! in
+                                   t_cohort,                 & ! in
+                                   mm_kco2_cohort,           & ! out
+                                   mm_ko2_cohort,            & ! out
+                                   co2_cpoint_cohort)
+                           end if
+                        end if
+
                         ! Identify the canopy layer (cl), functional type (ft)
                         ! and the leaf layer (IV) for this cohort
                         ft = currentCohort%pft
                         cl = currentCohort%canopy_layer
-
-                        ! [PORTED by Hui Tang: select NVP surface temperature for NVP cohorts]
-                        if (hlm_use_nvp == itrue .and. currentCohort%nvp_dz > nearzero) then
-                           t_cohort = bc_in(s)%t_nvp_pa(ifp)
-                        else
-                           t_cohort = bc_in(s)%t_veg_pa(ifp)
-                        end if
 
                         ! [DBG NVP PHOTO] cohort-level state for NVP cohorts
                         if (hlm_use_nvp == itrue .and. currentCohort%nvp_dz > nearzero) then
@@ -843,9 +846,9 @@ contains
                                             bc_in(s)%esat_tv_pa(ifp),           &  ! in
                                             gb_mol,                             &  ! in
                                             bc_in(s)%eair_pa(ifp),              &  ! in
-                                            mm_kco2,                            &  ! in
-                                            mm_ko2,                             &  ! in
-                                            co2_cpoint,                         &  ! in
+                                            mm_kco2_cohort,                     &  ! in
+                                            mm_ko2_cohort,                      &  ! in
+                                            co2_cpoint_cohort,                  &  ! in
                                             lmr_z(iv,ft,cl),                    &  ! in
                                             ci_tol,                             &  ! in
                                             psn_ll,                             &  ! out
@@ -872,9 +875,9 @@ contains
                                             bc_in(s)%esat_tv_pa(ifp),           &  ! in
                                             gb_mol,                             &  ! in
                                             bc_in(s)%eair_pa(ifp),              &  ! in
-                                            mm_kco2,                            &  ! in
-                                            mm_ko2,                             &  ! in
-                                            co2_cpoint,                         &  ! in
+                                            mm_kco2_cohort,                     &  ! in
+                                            mm_ko2_cohort,                      &  ! in
+                                            co2_cpoint_cohort,                  &  ! in
                                             lmr_z(iv,ft,cl),                    &  ! in
                                             ci_tol,                             &  ! in
                                             psn_ll,                             &  ! out
